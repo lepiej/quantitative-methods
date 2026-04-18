@@ -35,21 +35,23 @@ View(data)
 # Yahoo Finance. Pobierzemy dane dla indeksu S&P 500 (`^GSPC`) oraz spółek 
 # IBM (`IBM`), Google (`GOOG`) i BP (`BP`).
 # 
-# Interesuje nas okres od YYYY-MM-DD do YYYY-MM-DD.
+# Interesuje nas okres od 2007-01-03 do 2026-04-17.
 # ==============================================================================
 
-
+startDate <- as.Date("2007-01-03")
+endDate <- as.Date("2026-04-17")
 
 # Pobieranie danych dla S&P 500, IBM, Google, BP
-
+getSymbols(c("^GSPC", "IBM", "GOOG", "BP"), from = startDate, to = endDate)
 
 # Sprawdźmy, jak wyglądają dane dla IBM. Obiekt `xts` zawiera ceny otwarcia, 
 # najwyższe, najniższe, zamknięcia, wolumen i ceny skorygowane.
 
-
+head(IBM)
 
 # Możemy również wygenerować wykres cen akcji poszczególnych indeksów używając funkcji `chart_Series`.
 
+chart_Series(IBM)
 
 # ==============================================================================
 # ### Obliczanie stóp zwrotu
@@ -60,7 +62,9 @@ View(data)
 # przyda się w modelu wielowymiarowym.
 # ==============================================================================
 
-
+rIBM <- dailyReturn(IBM)
+rBP <- dailyReturn(BP)
+rGOOG <- dailyReturn(GOOG)
 
 # Tworzymy zestaw danych dla modelu wielowymiarowego
 rX <- merge(rIBM, rBP, rGOOG)
@@ -81,6 +85,7 @@ colnames(rX) <- c("rIBM", "rBP", "rGOOG")
 
 # Specyfikacja modelu: AR(1) dla średniej, GARCH(1,1) dla wariancji
 
+ug_spec <- ugarchspec(mean.model = list(armaOrder = c(1, 0)))
 
 # ==============================================================================
 # ### Estymacja modelu
@@ -90,6 +95,7 @@ colnames(rX) <- c("rIBM", "rBP", "rGOOG")
 # oraz testy diagnostyczne.
 # ==============================================================================
 
+ugfit <- ugarchfit(spec = ug_spec, data = rIBM)
 
 # ==============================================================================
 # ### Analiza wyników
@@ -116,7 +122,7 @@ lines(ug_var, col = "green")
 # Zauważ, że `sigma` w prognozie to zmienność (odchylenie standardowe), czyli 
 # pierwiastek z wariancji.
 # ==============================================================================
-
+ugfore <- ugarchforecast(ugfit, n.ahead = 10)
 
 # Wyciągnięcie prognozy zmienności (sigma)
 ug_f_sigma <- as.numeric(sigma(ugfore)) 
@@ -153,16 +159,16 @@ lines(ug_var_t, col = "green")
 # ==============================================================================
 
 # Specyfikacja jednowymiarowa dla 3 aktywów
-
+uspec.n <- multispec(replicate(3, ugarchspec(mean.model = list(armaOrder = c(1, 0)))))
 
 # Dopasowanie modeli jednowymiarowych (Univariate fit)
-
+multf <- multifit(uspec.n, rX)
 
 # Teraz specyfikujemy model korelacji DCC. Użyjemy standardowego rzędu (1,1) i 
 # wielowymiarowego rozkładu normalnego (`mvnorm`).
 
 # Specyfikacja DCC
-
+spec1 <- dccspec(uspec.n, dccOrder = c(1,1), distribution = "mvnorm")
 
 # Estymacja modelu DCC
 # fit = multf wskazuje, by użyć wcześniej obliczonych modeli jednowymiarowych
